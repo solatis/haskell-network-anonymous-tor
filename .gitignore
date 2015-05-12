@@ -4,13 +4,9 @@ cabal-dev
 *.hi
 *.chi
 *.chs.h
-*.dyn_o
-*.dyn_hi
 .virtualenv
-.hpc
 .hsenv
 .cabal-sandbox/
+.hpc/
 cabal.sandbox.config
-*.prof
-*.aux
-*.hp
+cabal.config

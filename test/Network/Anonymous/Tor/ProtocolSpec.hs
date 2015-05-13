@@ -40,4 +40,4 @@ mockServer port callback = do
   return tid
 
 spec :: Spec
-spec = undefined
+spec = return ()

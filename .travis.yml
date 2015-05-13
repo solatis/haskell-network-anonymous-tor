@@ -25,6 +25,10 @@ before_install:
  - sudo sed -i /etc/tor/torrc -e 's/#ControlPort 9051/ControlPort 9051/'
  - sudo sed -i /etc/tor/torrc -e 's/#CookieAuthentication 1/CookieAuthentication 1/'
  - sudo service tor start
+ - ps aux | grep tor
+ 
+# Wait until Tor control port is open
+ - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
 
 # Installing cabal and ghc
  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER # see note about happy/alex
@@ -47,9 +51,6 @@ before_install:
  - travis_retry cabal sandbox init
  - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/ --constraint='aeson >= 0.7'
  - cabal sandbox delete
-
-# Wait until SAM and BOB bridges are open
- - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
 
 install:
  - cabal --version

@@ -26,14 +26,15 @@ before_install:
  - sudo sed -i /etc/tor/torrc -e 's/#CookieAuthentication 1/CookieAuthentication 1/'
  - sudo service tor start
  - ps aux | grep tor
- 
-# Wait until Tor control port is open
- - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
 
-# Installing cabal and ghc
+ # Installing cabal and ghc
  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER # see note about happy/alex
  - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
  - travis_retry cabal update
+
+# Wait until Tor control port is open
+ - cat /var/log/tor
+ - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
  
 # Happy/alex hack for ghc > 7.8.1
  - |

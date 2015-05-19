@@ -24,6 +24,10 @@ library
 
   exposed-modules:     Network.Anonymous.Tor
                        Network.Anonymous.Tor.Error
+                       Network.Anonymous.Tor.Protocol
+                       Network.Anonymous.Tor.Protocol.Types
+                       Network.Anonymous.Tor.Protocol.Parser
+                       Network.Anonymous.Tor.Protocol.Parser.Ast
 
   build-depends:       base                     >= 4.3          && < 5
                      , transformers
@@ -57,6 +61,7 @@ test-suite test-suite
                      , network-simple
 
                      , hspec
+                     , hspec-attoparsec
                      , hspec-expectations
 
                      , network-anonymous-tor

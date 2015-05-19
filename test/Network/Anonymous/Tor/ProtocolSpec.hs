@@ -16,6 +16,7 @@ import qualified Network.Socket.ByteString               as NSB (recv, sendAll)
 
 import qualified Network.Anonymous.Tor.Error             as E
 import qualified Network.Anonymous.Tor.Util              as U
+import qualified Network.Anonymous.Tor.Protocol          as P
 
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Char8                   as BS8
@@ -39,5 +40,25 @@ mockServer port callback = do
   liftIO $ threadDelay 500000
   return tid
 
+whichPort :: IO Integer
+whichPort = do
+  ports <- P.detectPort [9051, 9151]
+  return (head ports)
+
+connect :: (NS.Socket -> IO a) -> IO a
+connect callback = do
+  port <- whichPort
+  P.connect "127.0.0.1" (show port) (\(sock, _) -> callback sock)
+
 spec :: Spec
-spec = return ()
+spec = do
+  describe "when detecting a Tor control port" $ do
+    it "should detect a port" $ do
+      ports <- P.detectPort [9051, 9151]
+      (length ports) `shouldBe` 1
+
+  describe "when detecting protocol info" $ do
+    it "should allow cookie authentication" $ do
+      info <- connect P.protocolInfo
+      putStrLn ("protocolInfo = " ++ show info)
+      True `shouldBe` True

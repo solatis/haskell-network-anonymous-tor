@@ -62,3 +62,8 @@ spec = do
     it "should allow cookie authentication" $ do
       info <- connect P.protocolInfo
       (PT.authMethods info) `shouldSatisfy` (elem PT.Cookie)
+
+  describe "when authenticating with Tor" $ do
+    it "should succeed" $ do
+      _ <- connect P.authenticate
+      True `shouldBe` True

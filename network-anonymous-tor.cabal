@@ -37,6 +37,7 @@ library
                      , attoparsec
                      , network-attoparsec
                      , exceptions
+                     , hexstring
 
                      , text
                      , bytestring

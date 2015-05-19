@@ -16,17 +16,17 @@ module Network.Anonymous.Tor.Protocol ( NST.connect
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (when)
+import           Control.Monad                             (unless, when)
 import           Control.Monad.Catch                       (handleAll)
 import           Control.Monad.IO.Class
 
 import qualified Data.Attoparsec.ByteString                as Atto
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Char8                     as BS8
+import qualified Data.HexString                            as HS
 import           Data.Maybe                                (catMaybes, fromJust)
 
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Encoding                        as TE
 
 import qualified Network.Attoparsec                        as NA
 import qualified Network.Simple.TCP                        as NST
@@ -48,6 +48,8 @@ sendCommand :: MonadIO m
             -> BS.ByteString  -- ^ The command / instruction we wish to send
             -> m Ast.Reply
 sendCommand s m = do
+  trace ("sending data: " ++ show m) (return ())
+
   _ <- liftIO $ Network.sendAll s m
   liftIO $ NA.parseOne s (Atto.parse Parser.reply)
 
@@ -110,9 +112,9 @@ protocolInfo s = do
     methods reply =
       map (read . BS8.unpack) . BS8.split ',' . fromJust . Ast.value "METHODS" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
 
-    cookieFile :: [Ast.Line] -> Maybe T.Text
+    cookieFile :: [Ast.Line] -> Maybe FilePath
     cookieFile reply =
-      fmap TE.decodeUtf8 . Ast.value "COOKIEFILE" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
+      fmap BS8.unpack . Ast.value "COOKIEFILE" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
 
 -- | Authenticates with the Tor control server, based on the authentication
 --   information returned by PROTOCOLINFO.
@@ -122,6 +124,22 @@ authenticate :: MonadIO m
 authenticate s = do
   info <- protocolInfo s
 
-  trace ("info = " ++ show info) (return ())
+  -- Ensure that we can authenticate using a cookie file
+  unless (T.Cookie `elem` T.authMethods info)
+    (E.torError (E.mkTorError E.permissionDeniedErrorType))
+
+  cookieData <- liftIO $ readCookie (T.cookieFile info)
+
+  Ast.Reply res <- sendCommand s (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
+
+  when
+    (Ast.statusCode res /= 250)
+    (E.torError (E.mkTorError E.permissionDeniedErrorType))
 
   return ()
+
+  where
+
+    readCookie :: Maybe FilePath -> IO HS.HexString
+    readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
+    readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file

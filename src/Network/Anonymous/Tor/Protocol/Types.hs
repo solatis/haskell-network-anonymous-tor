@@ -29,6 +29,6 @@ data ProtocolInfo = ProtocolInfo {
 
   authMethods     :: [AuthMethod],
 
-  cookieFile      :: Maybe T.Text
+  cookieFile      :: Maybe FilePath
 
   } deriving (Show, Eq)

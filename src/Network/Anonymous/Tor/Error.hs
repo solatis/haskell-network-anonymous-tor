@@ -27,6 +27,7 @@ data TorErrorType
   = Timeout
   | Unreachable
   | ProtocolError
+  | PermissionDenied
   deriving (Show, Eq)
 
 -- | Generates new TorException
@@ -44,6 +45,10 @@ unreachableErrorType = Unreachable
 -- | Tor error when communication with the SAM bridge fails
 protocolErrorType :: TorErrorType
 protocolErrorType = ProtocolError
+
+-- | Tor error when communication with the SAM bridge fails
+permissionDeniedErrorType :: TorErrorType
+permissionDeniedErrorType = PermissionDenied
 
 -- | Raise an Tor Exception in the IO monad
 torException :: (MonadIO m)

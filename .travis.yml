@@ -21,15 +21,21 @@ before_install:
  - travis_retry sudo apt-get update
  - travis_retry sudo apt-get install -y tor deb.torproject.org-keyring
 
+# Ensure that our executing user is able to read the tor auth cookie
+ - sudo usermod -a -G debian-tor $USER
+
 # This generates the initial configuration
  - sudo service tor start
  - sudo service tor stop
 
  - sudo sed -i /etc/tor/torrc -e 's/#ControlPort 9051/ControlPort 9051/'
- - sudo sed -i /etc/tor/torrc -e 's/#CookieAuthentication 1/CookieAuthentication 1/'
+ - sudo sed -i /etc/tor/torrc -e 's/#CookieAuthentication 1/CookieAuthentication 1\nExtORPortCookieAuthFileGroupReadable 1/'
  
  - sudo service tor start
  - ps aux | grep tor
+
+# Test reading of tor auth cookie
+ - cat /var/run/tor/control.authcookie
 
 # Wait until Tor control port is open
  - sudo cat /var/log/tor/log

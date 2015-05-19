@@ -17,6 +17,7 @@ import qualified Network.Socket.ByteString               as NSB (recv, sendAll)
 import qualified Network.Anonymous.Tor.Error             as E
 import qualified Network.Anonymous.Tor.Util              as U
 import qualified Network.Anonymous.Tor.Protocol          as P
+import qualified Network.Anonymous.Tor.Protocol.Types    as PT
 
 import qualified Data.ByteString                         as BS
 import qualified Data.ByteString.Char8                   as BS8
@@ -60,5 +61,4 @@ spec = do
   describe "when detecting protocol info" $ do
     it "should allow cookie authentication" $ do
       info <- connect P.protocolInfo
-      putStrLn ("protocolInfo = " ++ show info)
-      True `shouldBe` True
+      (PT.authMethods info) `shouldSatisfy` (elem PT.Cookie)

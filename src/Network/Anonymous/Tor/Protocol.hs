@@ -70,7 +70,7 @@ detectPort possible = do
     -- an expected fashion to 'protocolInfo', returns Nothing otherwise.
     hasTor :: Integer -> IO (Maybe Integer)
     hasTor port = do
-      result <- liftIO $ newEmptyMVar
+      result <- liftIO newEmptyMVar
 
       handleAll
         (\_ -> liftIO $ putMVar result Nothing)
@@ -104,15 +104,15 @@ protocolInfo s = do
 
     torVersion :: [Ast.Line] -> [Integer]
     torVersion reply =
-      map fst . map fromJust . (map BS8.readInteger) . (BS8.split '.') . fromJust . (Ast.value "Tor") . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "VERSION") reply
+      map (fst . fromJust . BS8.readInteger) . BS8.split '.' . fromJust . Ast.value "Tor" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "VERSION") reply
 
     methods :: [Ast.Line] -> [T.AuthMethod]
     methods reply =
-      (map read) . (map BS8.unpack) . (BS8.split ',') . fromJust . (Ast.value "METHODS") . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
+      map (read . BS8.unpack) . BS8.split ',' . fromJust . Ast.value "METHODS" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
 
     cookieFile :: [Ast.Line] -> Maybe T.Text
     cookieFile reply =
-      (fmap TE.decodeUtf8) . (Ast.value "COOKIEFILE") . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
+      fmap TE.decodeUtf8 . Ast.value "COOKIEFILE" . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "AUTH") reply
 
 -- | Authenticates with the Tor control server, based on the authentication
 --   information returned by PROTOCOLINFO.

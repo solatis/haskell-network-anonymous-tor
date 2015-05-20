@@ -68,6 +68,7 @@ install:
 script:
  # Test reading of tor auth cookie
  - id
+ - /bin/bash id
  - sudo ls -l /var/run/tor/
  - cat /var/run/tor/control.authcookie
 

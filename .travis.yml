@@ -52,8 +52,8 @@ before_install:
      travis_retry sudo apt-get install happy alex
    fi
 
-# Install hlint
- - cabal install hlint
+# Install hlint (via apt-get if available, otherwise via cabal)
+ - travis_retry sudo apt-get -q -y install hlint || cabal install hlint
  
 # Install hpc-coveralls
  - travis_retry cabal sandbox init

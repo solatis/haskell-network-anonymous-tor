@@ -38,10 +38,6 @@ before_install:
  - sudo cat /var/log/tor/log
  - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
 
- # Test reading of tor auth cookie
- - sudo ls -l /var/run/tor/
- - cat /var/run/tor/control.authcookie
-
 # Installing cabal and ghc
  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER # see note about happy/alex
  - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
@@ -70,6 +66,10 @@ install:
  - travis_retry cabal install --only-dependencies --enable-tests --enable-benchmarks -j
 
 script:
+ # Test reading of tor auth cookie
+ - sudo ls -l /var/run/tor/
+ - cat /var/run/tor/control.authcookie
+
  - hlint src --ignore="Parse error"
  - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug 
  - cabal build -j

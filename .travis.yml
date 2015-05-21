@@ -59,6 +59,7 @@ before_install:
  - travis_retry cabal sandbox init
  - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/ --constraint='aeson >= 0.7'
  - cabal sandbox delete
+ - which run-cabal-test
 
 install:
  - cabal --version

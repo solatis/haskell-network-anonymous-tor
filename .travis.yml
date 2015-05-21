@@ -72,7 +72,7 @@ script:
  - hlint src --ignore="Parse error"
  - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug 
  - cabal build -j
- - travis_retry sudo -E su $USER -c 'run-cabal-test --cabal-name=cabal --show-details=streaming'
+ - travis_retry sudo -E su $USER -c '/home/$USER/.cabal/bin/run-cabal-test --cabal-name=cabal --show-details=streaming'
  - cabal check
  - cabal sdist
  

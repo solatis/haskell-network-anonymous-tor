@@ -55,12 +55,6 @@ before_install:
 # Install hlint (via apt-get if available, otherwise via cabal)
  - travis_retry sudo apt-get -q -y install hlint || cabal install hlint
  
-# Install hpc-coveralls
- - travis_retry cabal sandbox init
- - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/ --constraint='aeson >= 0.7'
- - cabal sandbox delete
- - which run-cabal-test
-
 install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
@@ -73,7 +67,7 @@ script:
  - hlint src --ignore="Parse error"
  - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug 
  - cabal build -j
- - travis_retry sudo -E su $USER -c 'run-cabal-test --cabal-name=cabal --show-details=streaming'
+ - travis_retry sudo -E su $USER -c 'cabal test --show-details=streaming'
  - cabal check
  - cabal sdist
  
@@ -87,7 +81,3 @@ script:
       exit 1;
    fi ;
    cd ../
-
-after_script:
- - find .
- - hpc-coveralls test-suite --exclude-dir=test --display-report

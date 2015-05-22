@@ -61,9 +61,6 @@ install:
  - travis_retry cabal install --only-dependencies --enable-tests --enable-benchmarks -j
 
 script:
- # Test reading of tor auth cookie
- - sudo -E su $USER -c 'cat /var/run/tor/control.authcookie'
-
  - hlint src --ignore="Parse error"
  - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug 
  - cabal build -j

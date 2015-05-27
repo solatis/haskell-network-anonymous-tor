@@ -50,7 +50,7 @@ sendCommand :: MonadIO m
             => Network.Socket -- ^ Our connection with the Tor control port
             -> BS.ByteString  -- ^ The command / instruction we wish to send
             -> m [Ast.Line]
-sendCommand sock msg = sendCommand' sock 250 E.protocolErrorType msg
+sendCommand sock = sendCommand' sock 250 E.protocolErrorType
 
 sendCommand' :: MonadIO m
              => Network.Socket -- ^ Our connection with the Tor control port

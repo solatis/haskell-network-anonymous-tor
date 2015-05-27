@@ -67,3 +67,12 @@ spec = do
     it "should succeed" $ do
       _ <- connect P.authenticate
       True `shouldBe` True
+
+  describe "when mapping an onion address" $ do
+    it "should succeed in creating a mapping" $ do
+      addr <- connect $ \sock -> do
+        P.authenticate sock
+        P.mapOnion sock 80 8080
+
+      putStrLn ("got onion address: " ++ show addr)
+      True `shouldBe` True

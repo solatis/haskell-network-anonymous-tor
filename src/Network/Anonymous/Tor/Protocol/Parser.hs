@@ -88,7 +88,7 @@ unquotedString :: Atto.Parser BS.ByteString
 unquotedString =
   Atto8.takeWhile1 (not . Atto8.isSpace)
 
-reply :: Atto.Parser A.Reply
+reply :: Atto.Parser [A.Line]
 reply = do
   -- A reply is a series of lines that look like 250-Foo or 250+Bar and then
   -- followed by a line that uses a space like 250 Wombat.
@@ -97,7 +97,7 @@ reply = do
   replies   <- Atto.many' (replyLine minus <|> replyLine plus)
   lastReply <- replyLine space
 
-  return $ A.Reply (replies ++ [lastReply])
+  return (replies ++ [lastReply])
 
   where
     replyLine :: Word8 -> Atto.Parser A.Line

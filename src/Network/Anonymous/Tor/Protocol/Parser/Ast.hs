@@ -25,10 +25,6 @@ data Line = Line {
   lineMessage :: [Token]
   } deriving (Show, Eq)
 
--- | A reply sent from Tor to controller
-data Reply = Reply [Line]
-  deriving (Show, Eq)
-
 -- | Returns true if the key was found
 key :: BS.ByteString -- ^ The key to look for
     -> [Token]       -- ^ Tokens to consider

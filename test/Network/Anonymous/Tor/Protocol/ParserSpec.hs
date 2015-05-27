@@ -65,13 +65,13 @@ spec = do
       let msg :: BS.ByteString
           msg = "250 OK\n"
 
-      in msg ~> reply `shouldParse` (Reply [Line 250 [Token "OK" Nothing]])
+      in msg ~> reply `shouldParse` ([Line 250 [Token "OK" Nothing]])
 
     it "should succeed on a multi line reply" $
       let msg :: BS.ByteString
           msg = "250-Foo Bar\n250 OK\n"
 
-      in msg ~> reply `shouldParse` (Reply [Line 250 [Token "Foo" Nothing, Token "Bar" Nothing],
+      in msg ~> reply `shouldParse` ([Line 250 [Token "Foo" Nothing, Token "Bar" Nothing],
                                             Line 250 [Token "OK" Nothing]])
 
     it "should parse protocolinfo reply" $
@@ -81,7 +81,7 @@ spec = do
                             , "250-VERSION Tor=\"0.2.6.7\""
                             , "250 OK"]
 
-      in msg ~> reply `shouldParse` (Reply [  Line 250 [Token "PROTOCOLINFO" Nothing, Token "1" Nothing]
+      in msg ~> reply `shouldParse` ([  Line 250 [Token "PROTOCOLINFO" Nothing, Token "1" Nothing]
                                             , Line 250 [Token "AUTH" Nothing, Token "METHODS" (Just "COOKIE,SAFECOOKIE,HASHEDPASSWORD"), Token "COOKIEFILE" (Just "C:\\\\Users\\\\leon\\\\Desktop\\\\Tor Browser\\\\Browser\\\\TorBrowser\\\\Data\\\\Tor\\\\control_auth_cookie")]
                                             , Line 250 [Token "VERSION" Nothing, Token "Tor" (Just "0.2.6.7")]
                                             , Line 250 [Token "OK" Nothing]])

@@ -12,11 +12,12 @@
 module Network.Anonymous.Tor.Protocol ( NST.connect
                                       , detectPort
                                       , protocolInfo
-                                      , authenticate ) where
+                                      , authenticate
+                                      , mapOnion ) where
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (unless, when)
+import           Control.Monad                             (unless, when, void)
 import           Control.Monad.Catch                       (handleAll)
 import           Control.Monad.IO.Class
 
@@ -24,6 +25,7 @@ import qualified Data.Attoparsec.ByteString                as Atto
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Char8                     as BS8
 import qualified Data.HexString                            as HS
+import qualified Data.Base32String.Default                 as B32
 import           Data.Maybe                                (catMaybes, fromJust)
 
 import qualified Data.Text.Encoding                        as TE
@@ -46,12 +48,27 @@ import           Debug.Trace                               (trace)
 sendCommand :: MonadIO m
             => Network.Socket -- ^ Our connection with the Tor control port
             -> BS.ByteString  -- ^ The command / instruction we wish to send
-            -> m Ast.Reply
-sendCommand s m = do
-  trace ("sending data: " ++ show m) (return ())
+            -> m [Ast.Line]
+sendCommand sock msg = sendCommand' sock 250 E.protocolErrorType msg
 
-  _ <- liftIO $ Network.sendAll s m
-  liftIO $ NA.parseOne s (Atto.parse Parser.reply)
+sendCommand' :: MonadIO m
+             => Network.Socket -- ^ Our connection with the Tor control port
+             -> Integer        -- ^ The status code we expect
+             -> E.TorErrorType -- ^ The type of error to throw if status code doesn't match
+             -> BS.ByteString  -- ^ The command / instruction we wish to send
+             -> m [Ast.Line]
+sendCommand' sock status errorType msg = do
+  trace ("sending data: " ++ show msg) (return ())
+
+  _   <- liftIO $ Network.sendAll sock msg
+  res <- liftIO $ NA.parseOne sock (Atto.parse Parser.reply)
+
+  trace ("got response: " ++ show res) (return ())
+
+  when (Ast.statusCode res /= status)
+    (E.torError (E.mkTorError errorType))
+
+  return res
 
 -- | Probes several default ports to see if there is a service at the remote
 --   that behaves like the Tor controller daemon. Will return a list of all
@@ -90,11 +107,7 @@ protocolInfo :: MonadIO m
              => Network.Socket
              -> m T.ProtocolInfo
 protocolInfo s = do
-  Ast.Reply res <- sendCommand s (BS.concat ["PROTOCOLINFO", "\n"])
-
-  when
-    (Ast.statusCode res /= 250)
-    (E.torError (E.mkTorError E.protocolErrorType))
+  res <- sendCommand s (BS.concat ["PROTOCOLINFO", "\n"])
 
   return (T.ProtocolInfo (protocolVersion res) (torVersion res) (methods res) (cookieFile res))
 
@@ -130,16 +143,24 @@ authenticate s = do
 
   cookieData <- liftIO $ readCookie (T.cookieFile info)
 
-  Ast.Reply res <- sendCommand s (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
-
-  when
-    (Ast.statusCode res /= 250)
-    (E.torError (E.mkTorError E.permissionDeniedErrorType))
-
-  return ()
+  liftIO . void $ sendCommand' s 250 E.permissionDeniedErrorType (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
 
   where
 
     readCookie :: Maybe FilePath -> IO HS.HexString
     readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
     readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
+
+-- | Sets up a .onion hidden service to map a remote port to a local service. The
+--   local service should be bound to 127.0.0.1
+mapOnion :: MonadIO m
+         => Network.Socket     -- ^ Connection with tor Control port
+         -> Integer            -- ^ Remote point of hidden service to listen at
+         -> Integer            -- ^ Local port to map onion service to
+         -> m B32.Base32String -- ^ The address/service id of the Onion without the .onion aprt
+mapOnion s rport lport = do
+  reply <- sendCommand s (BS8.concat ["ADD_ONION NEW:BEST Port=", BS8.pack (show rport), ",127.0.0.1:", BS8.pack(show lport), "\n"])
+
+  liftIO $ putStrLn ("got mapOnion result: " ++ show reply)
+
+  return . B32.b32String' . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "ServiceID") reply

@@ -11,6 +11,7 @@
 --
 module Network.Anonymous.Tor.Protocol ( NST.connect
                                       , detectPort
+                                      , socksPort
                                       , protocolInfo
                                       , authenticate
                                       , mapOnion ) where
@@ -151,6 +152,18 @@ authenticate s = do
     readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
     readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
 
+-- | Returns the configured SOCKS proxy port
+socksPort :: MonadIO m
+          => Network.Socket
+          -> m Integer
+socksPort s = do
+  reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
+
+  liftIO $ putStrLn ("got socksport reply: " ++ show reply)
+
+  return . fst . fromJust . BS8.readInteger . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "SocksPort") reply
+
+
 -- | Sets up a .onion hidden service to map a remote port to a local service. The
 --   local service should be bound to 127.0.0.1
 mapOnion :: MonadIO m
@@ -160,7 +173,5 @@ mapOnion :: MonadIO m
          -> m B32.Base32String -- ^ The address/service id of the Onion without the .onion aprt
 mapOnion s rport lport = do
   reply <- sendCommand s (BS8.concat ["ADD_ONION NEW:BEST Port=", BS8.pack (show rport), ",127.0.0.1:", BS8.pack(show lport), "\n"])
-
-  liftIO $ putStrLn ("got mapOnion result: " ++ show reply)
 
   return . B32.b32String' . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "ServiceID") reply

@@ -68,6 +68,14 @@ spec = do
       _ <- connect P.authenticate
       True `shouldBe` True
 
+  describe "when detecting SOCKS port" $ do
+    it "should return a valid port" $ do
+      port <- connect $ \sock -> do
+        P.authenticate sock
+        P.socksPort sock
+
+      port `shouldSatisfy` (> 1024)
+
   describe "when mapping an onion address" $ do
     it "should succeed in creating a mapping" $ do
       addr <- connect $ \sock -> do

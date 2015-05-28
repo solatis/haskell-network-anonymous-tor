@@ -9,24 +9,25 @@
 --                interface of these functions might change at any time without
 --                prior notice.
 --
-module Network.Anonymous.Tor.Protocol ( NST.connect
-                                      , detectPort
+module Network.Anonymous.Tor.Protocol ( detectPort
                                       , socksPort
+                                      , connect
+                                      , connect'
                                       , protocolInfo
                                       , authenticate
                                       , mapOnion ) where
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (unless, when, void)
+import           Control.Monad                             (unless, void, when)
 import           Control.Monad.Catch                       (handleAll)
 import           Control.Monad.IO.Class
 
 import qualified Data.Attoparsec.ByteString                as Atto
+import qualified Data.Base32String.Default                 as B32
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Char8                     as BS8
 import qualified Data.HexString                            as HS
-import qualified Data.Base32String.Default                 as B32
 import           Data.Maybe                                (catMaybes, fromJust)
 
 import qualified Data.Text.Encoding                        as TE
@@ -38,6 +39,7 @@ import qualified Network.Socket                            as Network hiding
                                                                        (recv,
                                                                        send)
 import qualified Network.Socket.ByteString                 as Network
+import qualified Network.Socks5                            as Socks
 
 import qualified Network.Anonymous.Tor.Error               as E
 import qualified Network.Anonymous.Tor.Protocol.Parser     as Parser
@@ -89,17 +91,57 @@ detectPort possible = do
     -- Returns the port if the remote service is available and responds in
     -- an expected fashion to 'protocolInfo', returns Nothing otherwise.
     hasTor :: Integer -> IO (Maybe Integer)
-    hasTor port = do
-      result <- liftIO newEmptyMVar
+    hasTor port = liftIO $ do
+      result <- newEmptyMVar
 
       handleAll
-        (\_ -> liftIO $ putMVar result Nothing)
+        (\_ -> putMVar result Nothing)
         (NST.connect "127.0.0.1" (show port) (\(sock, _) -> do
-                                                 info <- protocolInfo sock
-                                                 liftIO $ putStrLn ("protocolInfo = " ++ show info)
-                                                 liftIO $ putMVar result (Just port)))
+                                                   _ <- protocolInfo sock
+                                                   putMVar result (Just port)))
 
-      liftIO $ takeMVar result
+      takeMVar result
+
+-- | Returns the configured SOCKS proxy port
+socksPort :: MonadIO m
+          => Network.Socket
+          -> m Integer
+socksPort s = do
+  reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
+
+  liftIO $ putStrLn ("got socksport reply: " ++ show reply)
+
+  return . fst . fromJust . BS8.readInteger . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "SocksPort") reply
+
+-- | Connect through a remote using the Tor SOCKS proxy. The remote might me a
+--   a normal host/ip or a hidden service address. When you provide a FQDN to
+--   resolve, it will be resolved by the Tor service, and as such is secure.
+connect :: MonadIO m
+        => Integer                  -- ^ Port our SOCKS server listens at.
+        -> Socks.SocksAddress       -- ^ Address we wish to connect to
+        -> (Network.Socket -> IO a) -- ^ Computation to execute once connection has been establised
+        -> m a
+connect sport remote callback = liftIO $ do
+
+  putStrLn ("Now establishing anonymous connection with remote: " ++ show remote)
+
+  (sock, _) <- Socks.socksConnect conf remote
+
+  putStrLn "Established connection!"
+
+  callback sock
+
+  where
+    conf = Socks.defaultSocksConf "127.0.0.1" (fromInteger sport)
+
+connect' :: MonadIO m
+         => Network.Socket
+         -> Socks.SocksAddress       -- ^ Address we wish to connect to
+         -> (Network.Socket -> IO a) -- ^ Computation to execute once connection has been establised
+         -> m a
+connect' sock remote callback = do
+  sport <- socksPort sock
+  connect sport remote callback
 
 -- | Requests protocol version information from Tor. This can be used while
 --   still unauthenticated and authentication methods can be derived from this
@@ -151,18 +193,6 @@ authenticate s = do
     readCookie :: Maybe FilePath -> IO HS.HexString
     readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
     readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
-
--- | Returns the configured SOCKS proxy port
-socksPort :: MonadIO m
-          => Network.Socket
-          -> m Integer
-socksPort s = do
-  reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
-
-  liftIO $ putStrLn ("got socksport reply: " ++ show reply)
-
-  return . fst . fromJust . BS8.readInteger . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "SocksPort") reply
-
 
 -- | Sets up a .onion hidden service to map a remote port to a local service. The
 --   local service should be bound to 127.0.0.1

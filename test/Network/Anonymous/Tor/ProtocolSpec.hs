@@ -2,27 +2,32 @@
 
 module Network.Anonymous.Tor.ProtocolSpec where
 
-import           Control.Concurrent                      (ThreadId, forkIO,
-                                                          killThread,
-                                                          threadDelay)
+import           Control.Concurrent                   (ThreadId, forkIO,
+                                                       killThread, threadDelay)
 import           Control.Concurrent.MVar
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 
-import qualified Network.Simple.TCP                      as NS (accept, listen,
-                                                                send)
-import qualified Network.Socket                          as NS (Socket)
-import qualified Network.Socket.ByteString               as NSB (recv, sendAll)
+import qualified Network.Simple.TCP                   as NS (accept, connect,
+                                                             listen, send)
+import qualified Network.Socket                       as NS (Socket)
+import qualified Network.Socket.ByteString            as NSB (recv, sendAll)
 
-import qualified Network.Anonymous.Tor.Error             as E
-import qualified Network.Anonymous.Tor.Util              as U
-import qualified Network.Anonymous.Tor.Protocol          as P
-import qualified Network.Anonymous.Tor.Protocol.Types    as PT
+import qualified Network.Anonymous.Tor.Error          as E
+import qualified Network.Anonymous.Tor.Protocol       as P
+import qualified Network.Anonymous.Tor.Protocol.Types as PT
+import qualified Network.Anonymous.Tor.Util           as U
+import qualified Network.Socks5.Types                 as SocksT
 
-import qualified Data.ByteString                         as BS
-import qualified Data.ByteString.Char8                   as BS8
-import           Data.Maybe                              (fromJust, isJust,
-                                                          isNothing)
+import qualified Data.Base32String.Default            as B32
+import qualified Data.ByteString                      as BS
+import qualified Data.ByteString.Char8                as BS8
+import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as TE
+
+
+import           Data.Maybe                           (fromJust, isJust,
+                                                       isNothing)
 
 import           Test.Hspec
 
@@ -49,7 +54,7 @@ whichPort = do
 connect :: (NS.Socket -> IO a) -> IO a
 connect callback = do
   port <- whichPort
-  P.connect "127.0.0.1" (show port) (\(sock, _) -> callback sock)
+  NS.connect "127.0.0.1" (show port) (\(sock, _) -> callback sock)
 
 spec :: Spec
 spec = do
@@ -76,11 +81,51 @@ spec = do
 
       port `shouldSatisfy` (> 1024)
 
-  describe "when mapping an onion address" $ do
-    it "should succeed in creating a mapping" $ do
-      addr <- connect $ \sock -> do
-        P.authenticate sock
-        P.mapOnion sock 80 8080
+  describe "when connecting through a SOCKS port" $ do
+    it "should be able to connect to google" $
+      let clientSock done sock =
+            putMVar done True
 
-      putStrLn ("got onion address: " ++ show addr)
-      True `shouldBe` True
+          constructSocksDestination =
+            SocksT.SocksAddress (SocksT.SocksAddrDomainName (BS8.pack "www.google.com")) 80
+
+      in do
+        done <- newEmptyMVar
+
+        _ <- connect $ \controlSock -> do
+          P.authenticate controlSock
+          P.connect' controlSock constructSocksDestination (clientSock done)
+
+        takeMVar done `shouldReturn` True
+
+  describe "when mapping an onion address" $ do
+    it "should succeed in creating a mapping" $
+      let serverSock sock = do
+            putStrLn "got client connecting to hidden service!"
+            NS.send sock "HELLO\n"
+          clientSock sock =
+            putStrLn "Got a connection with hidden service!"
+
+          destinationAddress onion =
+            TE.encodeUtf8 $ T.concat [B32.toText onion, T.pack ".ONION"]
+
+          constructSocksDestination onion =
+            SocksT.SocksAddress (SocksT.SocksAddrDomainName (destinationAddress onion)) 80
+
+      in do
+        thread <- liftIO $ mockServer "8080" serverSock
+
+        _ <- connect $ \controlSock -> do
+          P.authenticate controlSock
+          addr <- P.mapOnion controlSock 80 8080
+
+          putStrLn ("got onion address: " ++ show addr)
+          putStrLn ("waiting 1 minute..")
+
+          threadDelay 60000000
+
+          putStrLn ("waited 1 minute, connecting..")
+
+          P.connect' controlSock (constructSocksDestination addr) clientSock
+
+        killThread thread

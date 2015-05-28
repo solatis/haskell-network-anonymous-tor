@@ -34,6 +34,8 @@ library
                      
                      , network
                      , network-simple
+                     , socks
+
                      , attoparsec
                      , network-attoparsec
                      , exceptions
@@ -55,12 +57,16 @@ test-suite test-suite
 
   build-depends:       base                     >= 4.3          && < 5
                      , exceptions
-                     , transformers
-                     
-                     , attoparsec
-                     , bytestring
+                     , transformers                     
+
                      , network
                      , network-simple
+                     , socks
+                                          
+                     , attoparsec
+                     , bytestring
+                     , base32string
+                     , text
 
                      , hspec
                      , hspec-attoparsec

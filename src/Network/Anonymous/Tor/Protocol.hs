@@ -116,8 +116,12 @@ socksPort s = do
 -- | Connect through a remote using the Tor SOCKS proxy. The remote might me a
 --   a normal host/ip or a hidden service address. When you provide a FQDN to
 --   resolve, it will be resolved by the Tor service, and as such is secure.
+--
+--   This function is provided as a convenience, since it doesn't actually use
+--   the Tor control protocol, and can be used to talk with any Socks5 compatible
+--   proxy server.
 connect :: MonadIO m
-        => Integer                  -- ^ Port our SOCKS server listens at.
+        => Integer                  -- ^ Port our tor SOCKS server listens at.
         -> Socks.SocksAddress       -- ^ Address we wish to connect to
         -> (Network.Socket -> IO a) -- ^ Computation to execute once connection has been establised
         -> m a
@@ -135,7 +139,7 @@ connect sport remote callback = liftIO $ do
     conf = Socks.defaultSocksConf "127.0.0.1" (fromInteger sport)
 
 connect' :: MonadIO m
-         => Network.Socket
+         => Network.Socket           -- ^ Our connection with the Tor control port
          -> Socks.SocksAddress       -- ^ Address we wish to connect to
          -> (Network.Socket -> IO a) -- ^ Computation to execute once connection has been establised
          -> m a
@@ -194,8 +198,9 @@ authenticate s = do
     readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
     readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
 
--- | Sets up a .onion hidden service to map a remote port to a local service. The
---   local service should be bound to 127.0.0.1
+-- | Creates a new hidden service and maps a public port to a local port. Useful
+--   for bridging a local service (e.g. a webserver or irc daemon) as a Tor
+--   hidden service.
 mapOnion :: MonadIO m
          => Network.Socket     -- ^ Connection with tor Control port
          -> Integer            -- ^ Remote point of hidden service to listen at

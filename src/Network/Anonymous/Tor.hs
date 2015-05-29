@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | This module provides the main interface for establishing secure and
@@ -11,51 +12,49 @@ module Network.Anonymous.Tor (
 
   -- * Client side
   -- $tor-client
+    P.connect
+  , P.connect'
 
   -- * Server side
   -- $tor-server
+  , P.mapOnion
+  , accept
+
+  -- * Probing Tor configuration information
+  , P.detectPort
+  , P.socksPort
 
   -- ** Setting up the context
+  , withSession
+
   ) where
 
 import           Control.Concurrent                      (forkIO)
 import           Control.Concurrent.MVar
 import           Control.Monad                           (forever)
 import           Control.Monad.Catch
+import           Control.Monad.IO.Class
 
+import qualified Data.Base32String.Default                 as B32
 import qualified Data.ByteString                         as BS
+
+import qualified Network.Simple.TCP                        as NST
 import qualified Network.Socket                          as Network
+
+import qualified Network.Anonymous.Tor.Protocol          as P
 
 
 --------------------------------------------------------------------------------
 -- $tor-introduction
 --
--- This module is an implementation of the SAMv3 protocol for Tor. Tor is an
--- internet anonimization network, similar to Tor. Whereas Tor is primarily
--- intended for privately browsing the world wide web, Tor is more application
--- oriented, and is intended for private communication between applications.
+-- This module is a (partial) implementation of the Tor control protocol. Tor is an
+-- internet anonimization network. Whereas historically, Tor is primarily
+-- intended for privately browsing the world wide web, the service also supports
+-- application oriented P2P communication, to implement communication between applications.
 --
--- The general idea of the SAM interface to Tor is that you establish a master
--- connection with the SAM bridge, and create new, short-lived connections with
--- the SAM bridge for the communication with the individual peers.
---
--- Tor provides three different ways of communicating with other hosts:
---
---  * __Virtual Streams__: similar to reliable TCP sockets, data is guaranteed to
---    be delivered, and in order. You can accept virtual streams and connect to
---    remote virtual streams, and use regular sockets to transmit the actual
---    messages.
---
---  * __Repliable Datagrams__: unreliable delivery of messages to a remote host,
---    but adds a reply-to address to the message so the remote host can send a
---    message back.
---
---  * __Anonymous Datagrams__: unreliable delivery of messages to a remote host,
---    and the remote host has no way to find out who sent the message.
---
--- Different methods of communication have different performance characteristics,
--- and an application developer should take these into careful consideration when
--- developing an application.
+-- The general idea of the Tor control interface to Tor is that you establish a master
+-- connection with the Tor control port, and create new, short-lived connections with
+-- the Tor bridge for the communication with the individual peers.
 --
 --------------------------------------------------------------------------------
 -- $tor-client
@@ -141,3 +140,37 @@ import qualified Network.Socket                          as Network
 --       return ()
 -- @
 --------------------------------------------------------------------------------
+
+-- | Establishes a connection and authenticates with the Tor control socket.
+--   After authorization has been succesfully completed it executes the callback
+--   provided.
+--
+--   Note that when the session completes, the connection with the Tor control
+--   port is dropped, which means that any port mappings, connections and hidden
+--   services you have registered within the session will be cleaned up. This
+--   is by design, to prevent stale mappings when an application crashes.
+withSession :: Integer                  -- | Port the Tor control server is listening at. Use
+                                        --   'detectPort' to probe possible ports.
+            -> (Network.Socket -> IO a) -- | Callback function called after a session has been
+                                        --   established succesfully.
+            -> IO a                     -- | Returns the value returned by the callback.
+withSession port callback =
+  NST.connect "127.0.0.1" (show port) (\(sock, _) -> do
+                                            _ <- P.authenticate sock
+                                            callback sock)
+
+-- | Convenience function that creates a new hidden service and starts accepting
+--   connections for it. Note that this creates a new local server at the same
+--   port as the public port, so ensure that the port is not yet in use.
+accept :: MonadIO m
+       => Network.Socket            -- | Connection with Tor control server
+       -> Integer                   -- | Port to listen at
+       -> (Network.Socket -> IO ()) -- | Callback function called for each incoming connection
+       -> m B32.Base32String        -- | Returns the hidden service descriptor created
+                                    --   without the '.onion' part.
+accept sock port callback = do
+  -- First create local service
+  _ <- liftIO $ forkIO $
+       NST.listen "*" (show port) (\(lsock, _) -> NST.accept lsock (\(sock, _) -> callback sock))
+
+  P.mapOnion sock port port

@@ -59,84 +59,85 @@ import qualified Network.Anonymous.Tor.Protocol          as P
 --------------------------------------------------------------------------------
 -- $tor-client
 --
--- == Virtual Stream
--- Establishing a 'S.VirtualStream' connection with a remote works as follows:
+-- == Connect through Tor with explicit port
+-- Connect through Tor on using a specified SOCKS port. Note that you do not
+-- need to authorize with the Tor control port for this functionality.
 --
 -- @
---   main = 'withSession' 'defaultEndPoint' 'S.VirtualStream' withinSession
+--   main = 'connect' 9050 constructDestination worker
 --
 --   where
---     dest :: 'D.PublicDestination'
---     dest = undefined
+--     constructDestination =
+--       'SocksT.SocksAddress' (SocksT.SocksAddrDomainName (BS8.pack "www.google.com")) 80
 --
---     withinSession :: 'S.Context' -> IO ()
---     withinSession ctx =
---       'connectStream' ctx dest worker
---
---     worker (sock, addr) = do
---       -- Now you may use sock to communicate with the remote; addr contains
---       -- the address of the remote we are connected to, which on our case
---       -- should match dest.
+--     worker sock =
+--       -- Now you may use sock to communicate with the remote.
 --       return ()
 -- @
 --
--- == Datagram
--- Sending a 'S.DatagramRepliable' message to a remote:
+-- == Connect through Tor using control port
+-- Connect through Tor and derive the SOCKS port from the Tor configuration. This
+-- function will query the Tor control service to find out which SOCKS port the
+-- Tor daemon listens at.
 --
 -- @
---   main = 'withSession' 'defaultEndPoint' 'S.DatagramRepliable' withinSession
+--   main = 'withSession' withinSession
 --
 --   where
---     dest :: 'D.PublicDestination'
---     dest = undefined
+--     constructDestination =
+--       'SocksT.SocksAddress' (SocksT.SocksAddrDomainName (BS8.pack "2a3b4c.onion")) 80
 --
---     withinSession :: 'S.Context' -> IO ()
---     withinSession ctx = do
---       'sendDatagram' ctx dest \"Hello, anonymous world!\"
+--     withinSession :: 'Network.Socket' -> IO ()
+--     withinSession sock = do
+--       'connect'' sock constructDestination worker
 --
---       -- SAM requires the master connection of a session to be alive longer
---       -- than any opertions that occur on the session are. Since sending a
---       -- datagram returns before the datagram might be actually handled by
---       -- Tor, it is adviced to wait a little while before closing the session.
---       threadDelay 1000000
+--     worker sock =
+--       -- Now you may use sock to communicate with the remote.
+--       return ()
 -- @
 --
 --------------------------------------------------------------------------------
 -- $tor-server
 --
--- == Virtual Stream
--- Running a server that accepts 'S.VirtualStream' connections.
+-- == Mapping
+-- Create a new hidden service, and map remote port 80 to local port 8080.
 --
 -- @
---   main = 'withSession' 'defaultEndPoint' 'S.VirtualStream' withinSession
+--   main = 'withSession' withinSession
 --
 --   where
---     withinSession :: 'S.Context' -> IO ()
---     withinSession ctx =
---       'serveStream' ctx worker
---
---     worker (sock, addr) = do
---       -- Now you may use sock to communicate with the remote; addr contains
---       -- the address of the remote we are connected to, which we might want
---       -- to store to send back messages asynchronously.
---       return ()
+--     withinSession :: 'Network.Socket' -> IO ()
+--     withinSession sock = do
+--       onion <- 'mapOnion' sock 80 8080
+--       -- At this point, 'onion' contains the base32 representation of
+--       -- our hidden service, without the trailing '.onion' part.
+--       --
+--       -- Remember that, once we leave this function, the connection with
+--       -- the Tor control service will be lost and any mappings will be
+--       -- cleaned up.
 -- @
 --
--- == Datagram
--- Receiving 'S.DatagramAnonymous' messages from remotes:
+-- == Server
+-- Convenience function which creates a hidden service on port 80 that is mapped
+-- to a server we create on the fly. Note that because we are mapping the hidden
+-- service's port 1:1 with our local port, port 80 must still be available.
 --
 -- @
---   main = 'withSession' 'defaultEndPoint' 'S.DatagramAnonymous' withinSession
+--   main = 'withSession' withinSession
 --
 --   where
---     withinSession :: 'S.Context' -> IO ()
---     withinSession ctx =
---       'serveDatagram' ctx worker
+--     withinSession :: 'Network.Socket' -> IO ()
+--     withinSession sock = do
+--       onion <- 'accept' sock 80 worker
+--       -- At this point, 'onion' contains the base32 representation of
+--       -- our hidden service, without the trailing '.onion' part, and any
+--       -- incoming connections will be redirected to our 'worker' function.
+--       --
+--       -- Once again, when we leave this function, all registered mappings
+--       -- will be lost.
 --
---     worker (sock, addr) = do
---       -- Now you may use sock to communicate with the remote; addr is an
---       -- instance of the 'Maybe' monad, and since we only accept anonymous
---       -- messages, should always be 'Nothing'.
+--     worker sock = do
+--       -- Now you may use sock to communicate with the remote.
 --       return ()
 -- @
 --------------------------------------------------------------------------------

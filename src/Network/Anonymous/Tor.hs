@@ -30,13 +30,9 @@ module Network.Anonymous.Tor (
   ) where
 
 import           Control.Concurrent                      (forkIO, threadDelay)
-import           Control.Concurrent.MVar
-import           Control.Monad                           (forever)
-import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 
 import qualified Data.Base32String.Default                 as B32
-import qualified Data.ByteString                         as BS
 
 import qualified Network.Simple.TCP                        as NST
 import qualified Network.Socket                          as Network
@@ -174,9 +170,9 @@ accept sock port callback = do
   _ <- liftIO $ forkIO $
        NST.listen "*" (show port) (\(lsock, _) -> do
                                         putStrLn ("started server on port " ++ show port ++ ", now accepting connections")
-                                        NST.accept lsock (\(sock, _) -> do
+                                        NST.accept lsock (\(csock, _) -> do
                                                                putStrLn "accepted connection, now executing callback"
-                                                               _ <- callback sock
+                                                               _ <- callback csock
                                                                threadDelay 1000000
                                                                return ()))
 

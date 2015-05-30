@@ -27,8 +27,6 @@ import qualified Data.ByteString.Char8                       as BS8
 import           Data.Word                                   (Word8)
 import qualified Network.Anonymous.Tor.Protocol.Parser.Ast   as A
 
-import Debug.Trace (trace)
-
 -- | Ascii offset representation of a double quote.
 doubleQuote :: Word8
 doubleQuote = 34

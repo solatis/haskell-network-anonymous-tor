@@ -2,8 +2,6 @@
 
 module Network.Anonymous.Tor.Protocol.Types where
 
-import qualified Data.Text as T
-
 -- | Authentication types supported by the Tor service
 data AuthMethod =
   Cookie | SafeCookie | HashedPassword

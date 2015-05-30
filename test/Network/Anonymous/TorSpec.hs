@@ -2,29 +2,15 @@
 
 module Network.Anonymous.TorSpec where
 
-import           Control.Concurrent                   (ThreadId, forkIO,
-                                                       killThread, threadDelay)
+import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.MVar
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
 
-import qualified Network.Socket                       as NS (Socket)
-import qualified Network.Socket.ByteString            as NSB (recv, sendAll)
-
-import qualified Network.Anonymous.Tor.Error          as E
 import qualified Network.Anonymous.Tor                as Tor
-import qualified Network.Anonymous.Tor.Protocol.Types as PT
 import qualified Network.Socks5.Types                 as SocksT
 
 import qualified Data.Base32String.Default            as B32
-import qualified Data.ByteString                      as BS
-import qualified Data.ByteString.Char8                as BS8
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
-
-
-import           Data.Maybe                           (fromJust, isJust,
-                                                       isNothing)
 
 import           Test.Hspec
 
@@ -63,10 +49,10 @@ spec = do
         constructDestination onion port =
             SocksT.SocksAddress (SocksT.SocksAddrDomainName (destinationAddress onion)) port
 
-        serverWorker serverDone sock = do
+        serverWorker serverDone _ = do
           putStrLn "Accepted connection"
           putMVar serverDone True
 
-        clientWorker clientDone sock = do
+        clientWorker clientDone _ = do
           putStrLn "Connected to hidden service!"
           putMVar clientDone True

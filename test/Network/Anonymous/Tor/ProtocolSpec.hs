@@ -11,23 +11,15 @@ import           Control.Monad.IO.Class
 import qualified Network.Simple.TCP                   as NS (accept, connect,
                                                              listen, send)
 import qualified Network.Socket                       as NS (Socket)
-import qualified Network.Socket.ByteString            as NSB (recv, sendAll)
 
-import qualified Network.Anonymous.Tor.Error          as E
 import qualified Network.Anonymous.Tor.Protocol       as P
 import qualified Network.Anonymous.Tor.Protocol.Types as PT
-import qualified Network.Anonymous.Tor.Util           as U
 import qualified Network.Socks5.Types                 as SocksT
 
 import qualified Data.Base32String.Default            as B32
-import qualified Data.ByteString                      as BS
 import qualified Data.ByteString.Char8                as BS8
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
-
-
-import           Data.Maybe                           (fromJust, isJust,
-                                                       isNothing)
 
 import           Test.Hspec
 
@@ -83,7 +75,7 @@ spec = do
 
   describe "when connecting through a SOCKS port" $ do
     it "should be able to connect to google" $
-      let clientSock done sock =
+      let clientSock done _ =
             putMVar done True
 
           constructSocksDestination =
@@ -103,7 +95,7 @@ spec = do
       let serverSock sock = do
             putStrLn "got client connecting to hidden service!"
             NS.send sock "HELLO\n"
-          clientSock sock =
+          clientSock _ =
             putStrLn "Got a connection with hidden service!"
 
           destinationAddress onion =

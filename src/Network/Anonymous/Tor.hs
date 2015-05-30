@@ -29,7 +29,7 @@ module Network.Anonymous.Tor (
 
   ) where
 
-import           Control.Concurrent                      (forkIO)
+import           Control.Concurrent                      (forkIO, threadDelay)
 import           Control.Concurrent.MVar
 import           Control.Monad                           (forever)
 import           Control.Monad.Catch
@@ -172,6 +172,12 @@ accept :: MonadIO m
 accept sock port callback = do
   -- First create local service
   _ <- liftIO $ forkIO $
-       NST.listen "*" (show port) (\(lsock, _) -> NST.accept lsock (\(sock, _) -> callback sock))
+       NST.listen "*" (show port) (\(lsock, _) -> do
+                                        putStrLn ("started server on port " ++ show port ++ ", now accepting connections")
+                                        NST.accept lsock (\(sock, _) -> do
+                                                               putStrLn "accepted connection, now executing callback"
+                                                               _ <- callback sock
+                                                               threadDelay 1000000
+                                                               return ()))
 
   P.mapOnion sock port port

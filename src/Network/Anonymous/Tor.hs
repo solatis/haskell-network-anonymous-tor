@@ -146,11 +146,12 @@ import qualified Network.Anonymous.Tor.Protocol          as P
 --   port is dropped, which means that any port mappings, connections and hidden
 --   services you have registered within the session will be cleaned up. This
 --   is by design, to prevent stale mappings when an application crashes.
-withSession :: Integer                  -- | Port the Tor control server is listening at. Use
+
+withSession :: Integer                  -- ^ Port the Tor control server is listening at. Use
                                         --   'detectPort' to probe possible ports.
-            -> (Network.Socket -> IO a) -- | Callback function called after a session has been
+            -> (Network.Socket -> IO a) -- ^ Callback function called after a session has been
                                         --   established succesfully.
-            -> IO a                     -- | Returns the value returned by the callback.
+            -> IO a                     -- ^ Returns the value returned by the callback.
 withSession port callback =
   NST.connect "127.0.0.1" (show port) (\(sock, _) -> do
                                             _ <- P.authenticate sock
@@ -160,18 +161,16 @@ withSession port callback =
 --   connections for it. Note that this creates a new local server at the same
 --   port as the public port, so ensure that the port is not yet in use.
 accept :: MonadIO m
-       => Network.Socket            -- | Connection with Tor control server
-       -> Integer                   -- | Port to listen at
-       -> (Network.Socket -> IO ()) -- | Callback function called for each incoming connection
-       -> m B32.Base32String        -- | Returns the hidden service descriptor created
+       => Network.Socket            -- ^ Connection with Tor control server
+       -> Integer                   -- ^ Port to listen at
+       -> (Network.Socket -> IO ()) -- ^ Callback function called for each incoming connection
+       -> m B32.Base32String        -- ^ Returns the hidden service descriptor created
                                     --   without the '.onion' part.
 accept sock port callback = do
   -- First create local service
   _ <- liftIO $ forkIO $
        NST.listen "*" (show port) (\(lsock, _) -> do
-                                        putStrLn ("started server on port " ++ show port ++ ", now accepting connections")
                                         NST.accept lsock (\(csock, _) -> do
-                                                               putStrLn "accepted connection, now executing callback"
                                                                _ <- callback csock
                                                                threadDelay 1000000
                                                                return ()))

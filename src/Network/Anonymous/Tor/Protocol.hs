@@ -46,8 +46,6 @@ import qualified Network.Anonymous.Tor.Protocol.Parser     as Parser
 import qualified Network.Anonymous.Tor.Protocol.Parser.Ast as Ast
 import qualified Network.Anonymous.Tor.Protocol.Types      as T
 
-import           Debug.Trace                               (trace)
-
 sendCommand :: MonadIO m
             => Network.Socket -- ^ Our connection with the Tor control port
             -> BS.ByteString  -- ^ The command / instruction we wish to send
@@ -61,12 +59,8 @@ sendCommand' :: MonadIO m
              -> BS.ByteString  -- ^ The command / instruction we wish to send
              -> m [Ast.Line]
 sendCommand' sock status errorType msg = do
-  trace ("sending data: " ++ show msg) (return ())
-
   _   <- liftIO $ Network.sendAll sock msg
   res <- liftIO $ NA.parseOne sock (Atto.parse Parser.reply)
-
-  trace ("got response: " ++ show res) (return ())
 
   when (Ast.statusCode res /= status)
     (E.torError (E.mkTorError errorType))
@@ -109,8 +103,6 @@ socksPort :: MonadIO m
 socksPort s = do
   reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
 
-  liftIO $ putStrLn ("got socksport reply: " ++ show reply)
-
   return . fst . fromJust . BS8.readInteger . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "SocksPort") reply
 
 -- | Connect through a remote using the Tor SOCKS proxy. The remote might me a
@@ -126,13 +118,7 @@ connect :: MonadIO m
         -> (Network.Socket -> IO a) -- ^ Computation to execute once connection has been establised
         -> m a
 connect sport remote callback = liftIO $ do
-
-  putStrLn ("Now establishing anonymous connection with remote: " ++ show remote)
-
   (sock, _) <- Socks.socksConnect conf remote
-
-  putStrLn "Established connection!"
-
   callback sock
 
   where

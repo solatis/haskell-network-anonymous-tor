@@ -169,7 +169,7 @@ accept :: MonadIO m
 accept sock port callback = do
   -- First create local service
   _ <- liftIO $ forkIO $
-       NST.listen "*" (show port) (\(lsock, _) -> do
+       NST.listen "*" (show port) (\(lsock, _) ->
                                         NST.accept lsock (\(csock, _) -> do
                                                                _ <- callback csock
                                                                threadDelay 1000000

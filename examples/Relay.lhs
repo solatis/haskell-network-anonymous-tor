@@ -1,7 +1,7 @@
 > import           System.Environment    (getArgs)
 > import           Control.Concurrent    (threadDelay, forkIO)
-> import           Control.Monad (void)
-> import System.IO (IOMode (ReadWriteMode))
+> import           Control.Monad         (void)
+> import           System.IO             (IOMode (ReadWriteMode))
 
 > import           Network               (withSocketsDo)
 > import qualified Network.Simple.TCP    as NST

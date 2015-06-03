@@ -83,8 +83,8 @@ data Availability =
 --   like the Tor controller daemon. Will return the status of the probed
 --   port.
 isAvailable :: MonadIO m
-           => Integer        -- ^ The ports we wish to probe
-           -> m Availability -- ^ The status of all the ports
+            => Integer        -- ^ The ports we wish to probe
+            -> m Availability -- ^ The status of all the ports
 isAvailable port = liftIO $ do
 
   result <- newEmptyMVar

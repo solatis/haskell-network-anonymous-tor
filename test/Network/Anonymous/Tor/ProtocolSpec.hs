@@ -40,8 +40,9 @@ mockServer port callback = do
 
 whichPort :: IO Integer
 whichPort = do
-  ports <- P.detectPort [9051, 9151]
-  return (head ports)
+  let ports = [9051, 9151]
+  availability <- mapM P.isAvailable ports
+  return . fst . head . filter ((== P.Available) . snd) $ zip ports availability
 
 connect :: (NS.Socket -> IO a) -> IO a
 connect callback = do
@@ -52,8 +53,8 @@ spec :: Spec
 spec = do
   describe "when detecting a Tor control port" $ do
     it "should detect a port" $ do
-      ports <- P.detectPort [9051, 9151]
-      (length ports) `shouldBe` 1
+      port <- whichPort
+      port `shouldSatisfy` (> 1024)
 
   describe "when detecting protocol info" $ do
     it "should allow cookie authentication" $ do

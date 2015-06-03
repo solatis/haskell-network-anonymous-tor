@@ -9,7 +9,8 @@
 --                interface of these functions might change at any time without
 --                prior notice.
 --
-module Network.Anonymous.Tor.Protocol ( detectPort
+module Network.Anonymous.Tor.Protocol ( Availability (..)
+                                      , isAvailable
                                       , socksPort
                                       , connect
                                       , connect'
@@ -20,15 +21,19 @@ module Network.Anonymous.Tor.Protocol ( detectPort
 import           Control.Concurrent.MVar
 
 import           Control.Monad                             (unless, void, when)
-import           Control.Monad.Catch                       (handleAll)
+import           Control.Monad.Catch                       ( handle
+                                                           , handleIOError )
 import           Control.Monad.IO.Class
+
+import qualified System.IO.Error as E
+import qualified GHC.IO.Exception as E hiding (ProtocolError)
 
 import qualified Data.Attoparsec.ByteString                as Atto
 import qualified Data.Base32String.Default                 as B32
 import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Char8                     as BS8
 import qualified Data.HexString                            as HS
-import           Data.Maybe                                (catMaybes, fromJust)
+import           Data.Maybe                                (fromJust)
 
 import qualified Data.Text.Encoding                        as TE
 
@@ -67,35 +72,38 @@ sendCommand' sock status errorType msg = do
 
   return res
 
--- | Probes several default ports to see if there is a service at the remote
---   that behaves like the Tor controller daemon. Will return a list of all
---   the probed ports that have a Tor service, since in some scenarios there
---   will be multiple Tor services (specifically, when a user has both the
---   Tor browser bundle and a separate Tor relay running).
-detectPort :: MonadIO m
-           => [Integer]   -- ^ The ports we wish to probe
-           -> m [Integer] -- ^ The ports which respond like a Tor service
-detectPort possible = do
+-- | Represents the availability status of Tor for a specific port.
+data Availability =
+  Available |         -- ^ There is a Tor control service listening at the port
+  ConnectionRefused | -- ^ There is no service listening at the port
+  IncorrectPort       -- ^ There is a non-Tor control service listening at the port
+  deriving (Show, Eq)
 
-  ports <- liftIO $ mapM hasTor possible
+-- | Probes a port to see if there is a service at the remote that behaves
+--   like the Tor controller daemon. Will return the status of the probed
+--   port.
+isAvailable :: MonadIO m
+           => Integer        -- ^ The ports we wish to probe
+           -> m Availability -- ^ The status of all the ports
+isAvailable port = liftIO $ do
 
-  return (catMaybes ports)
+  result <- newEmptyMVar
+
+  handle (\(E.TorError E.ProtocolError) -> putMVar result IncorrectPort)
+    $ handleIOError (\e  ->
+                      -- The error raised for a Connection Refused is a very descriptive OtherError
+                      if   E.ioeGetErrorType e == E.OtherError || E.ioeGetErrorType e == E.NoSuchThing
+                      then putMVar result ConnectionRefused
+                      else E.ioError e)
+    (performTest port result)
+
+  takeMVar result
 
   where
-    -- Returns the port if the remote service is available and responds in
-    -- an expected fashion to 'protocolInfo', returns Nothing otherwise.
-    hasTor :: Integer -> IO (Maybe Integer)
-    hasTor port = liftIO $ do
-      result <- newEmptyMVar
-
-      handleAll
-        (\_ -> putMVar result Nothing)
-        (NST.connect "127.0.0.1" (show port) (\(sock, _) -> do
-                                                   _ <- protocolInfo sock
-                                                   putMVar result (Just port)))
-
-      takeMVar result
-
+    performTest port result =
+      NST.connect "127.0.0.1" (show port) (\(sock, _) -> do
+                                                _ <- protocolInfo sock
+                                                putMVar result Available)
 -- | Returns the configured SOCKS proxy port
 socksPort :: MonadIO m
           => Network.Socket

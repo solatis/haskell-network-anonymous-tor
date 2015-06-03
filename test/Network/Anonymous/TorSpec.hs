@@ -16,8 +16,9 @@ import           Test.Hspec
 
 whichPort :: IO Integer
 whichPort = do
-  ports <- Tor.detectPort [9051, 9151]
-  return (head ports)
+  let ports = [9051, 9151]
+  availability <- mapM Tor.isAvailable ports
+  return . fst . head . filter ((== Tor.Available) . snd) $ zip ports availability
 
 spec :: Spec
 spec = do

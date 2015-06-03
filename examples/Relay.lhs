@@ -26,13 +26,24 @@ execution in the 'withinSession' function.
 
 We need a simple function to detect which control port Tor listens at. By
 default the Tor service uses port 9051, but the Tor Browser Bundle uses 9151,
-to allow Tor and the TBB to run next to each other. This function is relatively
-unsafe, since it assumes at least one Tor service is running (otherwise 'head'
-will return an error).
+to allow Tor and the TBB to run next to each other.
 
 >     whichControlPort = do
->       ports <- Tor.detectPort [9051, 9151]
->       return (head ports)
+>       let ports = [9051, 9151]
+>
+>       availability <- mapM Tor.isAvailable ports
+
+At this point, the `ports` list describes the list of ports in which we think
+a Tor controller might be active, and `availability` has a list of the same length
+with the associated availability status.
+
+Since we're only interested in services that are available, we are going to
+combine these list, filter on the availability status, and return the first port
+that matches these constraints. This functionality is relatively unsafe, since
+it assumes at least one Tor service is running (otherwise 'head' will return an
+error).
+
+>       return . fst . head . filter ((== Tor.Available) . snd) $ zip ports availability
 
 Some boilerplate code: we need to set up a port mapping, and rather than hard-
 coding it, we allow the user to provide is as command line arguments. The first

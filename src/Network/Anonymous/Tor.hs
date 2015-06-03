@@ -21,7 +21,8 @@ module Network.Anonymous.Tor (
   , accept
 
   -- * Probing Tor configuration information
-  , P.detectPort
+  , P.Availability (..)
+  , P.isAvailable
   , P.socksPort
 
   -- ** Setting up the context

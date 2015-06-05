@@ -94,7 +94,10 @@ isAvailable port = liftIO $ do
                       -- The error raised for a Connection Refused is a very descriptive OtherError
                       if   E.ioeGetErrorType e == E.OtherError || E.ioeGetErrorType e == E.NoSuchThing
                       then putMVar result ConnectionRefused
-                      else E.ioError e)
+                      else if   E.ioeGetErrorType e == E.UserError -- This gets thrown by network-attoparsec
+                                                                   -- when there is a parse error.
+                           then putMVar result IncorrectPort
+                           else E.ioError e)
     (performTest port result)
 
   takeMVar result

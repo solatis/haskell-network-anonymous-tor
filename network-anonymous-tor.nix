@@ -9,6 +9,8 @@ mkDerivation {
   src = ./.;
   isLibrary = true;
   isExecutable = true;
+  doCheck = false;
+  
   buildDepends = [
     attoparsec base base32string bytestring exceptions hexstring
     network network-attoparsec network-simple socks splice text

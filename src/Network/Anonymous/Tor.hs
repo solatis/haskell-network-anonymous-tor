@@ -18,7 +18,9 @@ module Network.Anonymous.Tor (
   -- * Server side
   -- $tor-server
   , P.mapOnion
+  , P.mapPersistentOnion
   , accept
+  , acceptPersistent
 
   -- * Probing Tor configuration information
   , P.Availability (..)
@@ -34,6 +36,7 @@ import           Control.Concurrent                      (forkIO, threadDelay)
 import           Control.Monad.IO.Class
 
 import qualified Data.Base32String.Default                 as B32
+import qualified Data.ByteString                           as BS
 
 import qualified Network.Simple.TCP                        as NST
 import qualified Network.Socket                          as Network
@@ -158,6 +161,24 @@ withSession port callback =
                                             _ <- P.authenticate sock
                                             callback sock)
 
+-- | Generalization of 'accept' and 'acceptPersistent'
+genericAccept :: MonadIO m
+       => m a                       -- ^ MonadIO action doing the onion mapping
+       -> Integer                   -- ^ Port to listen at
+       -> (Network.Socket -> IO ()) -- ^ Callback function called for each incoming connection
+       -> m a                       -- ^ Returns the result of the mapping function
+genericAccept mapOnion port callback = do
+  -- First create local service
+  _ <- liftIO $ forkIO $
+       NST.listen "*" (show port) (\(lsock, _) ->
+                                        NST.accept lsock (\(csock, _) -> do
+                                                               _ <- callback csock
+                                                               threadDelay 1000000
+                                                               return ()))
+
+  -- Do the onion mapping after that
+  mapOnion
+
 -- | Convenience function that creates a new hidden service and starts accepting
 --   connections for it. Note that this creates a new local server at the same
 --   port as the public port, so ensure that the port is not yet in use.
@@ -167,13 +188,18 @@ accept :: MonadIO m
        -> (Network.Socket -> IO ()) -- ^ Callback function called for each incoming connection
        -> m B32.Base32String        -- ^ Returns the hidden service descriptor created
                                     --   without the '.onion' part.
-accept sock port callback = do
-  -- First create local service
-  _ <- liftIO $ forkIO $
-       NST.listen "*" (show port) (\(lsock, _) ->
-                                        NST.accept lsock (\(csock, _) -> do
-                                                               _ <- callback csock
-                                                               threadDelay 1000000
-                                                               return ()))
+accept sock port = genericAccept (P.mapOnion sock port port) port
 
-  P.mapOnion sock port port
+-- | Convenience function that creates a hidden service from an existing
+--   private key in base64 and starts accepting connections for it. Note that
+--   this creates a new local server at the same port as the public port, so
+--   ensure that the port is not yet in use.
+acceptPersistent :: MonadIO m
+       => Network.Socket            -- ^ Connection with Tor control server
+       -> Integer                   -- ^ Port to listen at
+       -> (Network.Socket -> IO ()) -- ^ Callback function called for each incoming connection
+       -> BS.ByteString             -- ^ Private key in Base64
+       -> m B32.Base32String        -- ^ Returns the hidden service descriptor created
+                                    --   without the '.onion' part.
+acceptPersistent sock port callback pkey =
+  genericAccept (P.mapPersistentOnion sock port port pkey) port callback

@@ -55,20 +55,54 @@ sendCommand :: MonadIO m
             => Network.Socket -- ^ Our connection with the Tor control port
             -> BS.ByteString  -- ^ The command / instruction we wish to send
             -> m [Ast.Line]
-sendCommand sock = sendCommand' sock 250 E.protocolErrorType
+sendCommand sock = sendCommand' sock errorF
+  where
+
+    errorF :: Ast.Line -> Maybe E.TorErrorType
+    errorF (Ast.Line 250 _     ) = Nothing
+    errorF (Ast.Line c   tokens) = let message = toMessage tokens
+                                       code    = codeName c
+                                       err     = show c ++ " " ++ code ++ ": " ++ message
+                                   in Just . E.protocolErrorType $ err
+
+    toMessage :: [Ast.Token] -> String
+    toMessage = unwords . map extract
+
+    extract :: Ast.Token -> String
+    extract (Ast.Token s Nothing ) = BS8.unpack s
+    extract (Ast.Token k (Just v)) = BS8.unpack k ++ "=" ++ BS8.unpack v
+
+    codeName :: Integer -> String
+    codeName 250 = "OK"
+    codeName 251 = "Operation was unnecessary"
+    codeName 451 = "Ressource exhausted"
+    codeName 500 = "Syntax error: protocol"
+    codeName 510 = "Unrecognized command"
+    codeName 511 = "Unimplemented command"
+    codeName 512 = "Syntax error in command argument"
+    codeName 513 = "Unrecognized command argument"
+    codeName 514 = "Authentication required"
+    codeName 550 = "Unspecified Tor error"
+    codeName 551 = "Internal error"
+    codeName 552 = "Unrecognized entity"
+    codeName 553 = "Invalid configuration value"
+    codeName 554 = "Invalid descriptor"
+    codeName 555 = "Unmanaged entity"
+    codeName 650 = "Asynchrounous event notification"
+    codeName _   = "Unrecognized status code"
 
 sendCommand' :: MonadIO m
-             => Network.Socket -- ^ Our connection with the Tor control port
-             -> Integer        -- ^ The status code we expect
-             -> E.TorErrorType -- ^ The type of error to throw if status code doesn't match
-             -> BS.ByteString  -- ^ The command / instruction we wish to send
+             => Network.Socket                     -- ^ Our connection with the Tor control port
+             -> (Ast.Line -> Maybe E.TorErrorType) -- ^ A function using the first line of the response to determine wether to throw an error
+             -> BS.ByteString                      -- ^ The command / instruction we wish to send
              -> m [Ast.Line]
-sendCommand' sock status errorType msg = do
+sendCommand' sock errorF msg = do
   _   <- liftIO $ Network.sendAll sock msg
   res <- liftIO $ NA.parseOne sock (Atto.parse Parser.reply)
 
-  when (Ast.statusCode res /= status)
-    (E.torError (E.mkTorError errorType))
+  case errorF . head $ res of
+    Just e -> E.torError (E.mkTorError e)
+    _      -> return ()
 
   return res
 
@@ -89,7 +123,7 @@ isAvailable port = liftIO $ do
 
   result <- newEmptyMVar
 
-  handle (\(E.TorError E.ProtocolError) -> putMVar result IncorrectPort)
+  handle (\(E.TorError (E.ProtocolError _)) -> putMVar result IncorrectPort)
     $ handleIOError (\e  ->
                       -- The error raised for a Connection Refused is a very descriptive OtherError
                       if   E.ioeGetErrorType e == E.OtherError || E.ioeGetErrorType e == E.NoSuchThing
@@ -183,17 +217,21 @@ authenticate s = do
 
   -- Ensure that we can authenticate using a cookie file
   unless (T.Cookie `elem` T.authMethods info)
-    (E.torError (E.mkTorError E.permissionDeniedErrorType))
+    (E.torError (E.mkTorError . E.permissionDeniedErrorType $ "Authentication via cookie file disabled."))
 
   cookieData <- liftIO $ readCookie (T.cookieFile info)
 
-  liftIO . void $ sendCommand' s 250 E.permissionDeniedErrorType (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
+  liftIO . void $ sendCommand' s errorF (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
 
   where
 
     readCookie :: Maybe FilePath -> IO HS.HexString
-    readCookie Nothing     = E.torError (E.mkTorError E.protocolErrorType)
+    readCookie Nothing     = E.torError (E.mkTorError . E.protocolErrorType $ "No cookie path specified.")
     readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
+
+    errorF :: Ast.Line -> Maybe E.TorErrorType
+    errorF (Ast.Line 250 _) = Nothing
+    errorF _                = Just . E.permissionDeniedErrorType $ "Authentication failed."
 
 -- | Creates a new hidden service and maps a public port to a local port. Useful
 --   for bridging a local service (e.g. a webserver or irc daemon) as a Tor

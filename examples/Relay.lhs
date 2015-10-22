@@ -60,7 +60,7 @@ control service, let's set up a new onion service which redirects incoming
 connections to the 'newConnection' function.
 
 >     withinSession (publicPort, privatePort) controlSock = do
->       onion <- Tor.accept controlSock publicPort (newConnection privatePort)
+>       onion <- Tor.accept controlSock publicPort Nothing (newConnection privatePort)
 >       putStrLn ("hidden service descriptor: " ++ show onion)
 
 If we would leave this function at this point, our connection with the Tor

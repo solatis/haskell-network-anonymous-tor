@@ -110,7 +110,7 @@ spec = do
 
         _ <- connect $ \controlSock -> do
           P.authenticate controlSock
-          addr <- P.mapOnion controlSock 80 8080
+          addr <- P.mapOnion controlSock 80 8080 False Nothing
 
           putStrLn ("got onion address: " ++ show addr)
           putStrLn ("waiting 1 minute..")

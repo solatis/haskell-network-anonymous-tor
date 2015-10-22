@@ -16,12 +16,11 @@ module Network.Anonymous.Tor.Protocol ( Availability (..)
                                       , connect'
                                       , protocolInfo
                                       , authenticate
-                                      , mapOnion
-                                      , mapPersistentOnion ) where
+                                      , mapOnion ) where
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (unless, void, when)
+import           Control.Monad                             (unless, void)
 import           Control.Monad.Catch                       ( handle
                                                            , handleIOError )
 import           Control.Monad.IO.Class
@@ -236,27 +235,24 @@ authenticate s = do
 
 -- | Creates a new hidden service and maps a public port to a local port. Useful
 --   for bridging a local service (e.g. a webserver or irc daemon) as a Tor
---   hidden service.
+--   hidden service. If a private key is supplied, it is used to instantiate the
+--   service.
 mapOnion :: MonadIO m
-         => Network.Socket     -- ^ Connection with tor Control port
-         -> Integer            -- ^ Remote point of hidden service to listen at
-         -> Integer            -- ^ Local port to map onion service to
-         -> m B32.Base32String -- ^ The address/service id of the Onion without the .onion aprt
-mapOnion s rport lport = do
-  reply <- sendCommand s (BS8.concat ["ADD_ONION NEW:BEST Port=", BS8.pack (show rport), ",127.0.0.1:", BS8.pack(show lport), "\n"])
-
-  return . B32.b32String' . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "ServiceID") reply
-
--- | Creates a hidden service from an existing private key in base64 and maps
---   a public port to a local port. Useful for bridging a local service (e.g. a
---   webserver or irc daemon) as a Tor hidden service.
-mapPersistentOnion :: MonadIO m
-         => Network.Socket     -- ^ Connection with tor Control port
-         -> Integer            -- ^ Remote point of hidden service to listen at
-         -> Integer            -- ^ Local port to map onion service to
-         -> BS.ByteString      -- ^ Private key in Base64
-         -> m B32.Base32String -- ^ The address/service id of the Onion without the .onion aprt
-mapPersistentOnion s rport lport pkey = do
-  reply <- sendCommand s (BS8.pack "ADD_ONION RSA1024:" `BS.append` pkey `BS.append` BS8.concat [" Port=", BS8.pack (show rport), ",127.0.0.1:", BS8.pack(show lport), "\n"])
+         => Network.Socket      -- ^ Connection with tor Control port
+         -> Integer             -- ^ Remote point of hidden service to listen at
+         -> Integer             -- ^ Local port to map onion service to
+         -> Bool                -- ^ Wether to detach the hidden service from the current session
+         -> Maybe BS.ByteString -- ^ Optional private key to use to set up the hidden service
+         -> m B32.Base32String  -- ^ The address/service id of the Onion without the .onion part
+mapOnion s rport lport detach pkey = do
+  reply <- sendCommand s $ BS8.concat
+                            [ "ADD_ONION "
+                            , maybe "NEW:BEST" (\pk -> "RSA1024:" `BS.append` pk) pkey
+                            , if detach then " Flags=Detach " else " "
+                            , "Port="
+                            , BS8.pack (show rport)
+                            , ",127.0.0.1:"
+                            , BS8.pack(show lport)
+                            , "\n"]
 
   return . B32.b32String' . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "ServiceID") reply

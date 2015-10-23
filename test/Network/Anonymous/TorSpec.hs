@@ -35,7 +35,7 @@ spec = do
 
       where
         withinSession clientDone serverDone sock = do
-          onion <- Tor.accept sock 4321 (serverWorker serverDone)
+          onion <- Tor.accept sock 4321 Nothing (serverWorker serverDone)
 
           putStrLn ("Got Tor hidden server: " ++ show onion)
           putStrLn ("waiting 30 seconds..")

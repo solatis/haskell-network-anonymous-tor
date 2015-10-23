@@ -34,6 +34,7 @@ import           Control.Concurrent                      (forkIO, threadDelay)
 import           Control.Monad.IO.Class
 
 import qualified Data.Base32String.Default                 as B32
+import qualified Data.ByteString                           as BS
 
 import qualified Network.Simple.TCP                        as NST
 import qualified Network.Socket                          as Network
@@ -162,12 +163,13 @@ withSession port callback =
 --   connections for it. Note that this creates a new local server at the same
 --   port as the public port, so ensure that the port is not yet in use.
 accept :: MonadIO m
-       => Network.Socket            -- ^ Connection with Tor control server
-       -> Integer                   -- ^ Port to listen at
-       -> (Network.Socket -> IO ()) -- ^ Callback function called for each incoming connection
-       -> m B32.Base32String        -- ^ Returns the hidden service descriptor created
-                                    --   without the '.onion' part.
-accept sock port callback = do
+       => Network.Socket                      -- ^ Connection with Tor control server
+       -> Integer                             -- ^ Port to listen at
+       -> Maybe BS.ByteString                 -- ^ Optional private key to use to set up the hidden service
+       -> (Network.Socket -> IO ())           -- ^ Callback function called for each incoming connection
+       -> m B32.Base32String -- ^ Returns the hidden service descriptor created without
+                                              --   the '.onion' part
+accept sock port pkey callback = do
   -- First create local service
   _ <- liftIO $ forkIO $
        NST.listen "*" (show port) (\(lsock, _) ->
@@ -176,4 +178,5 @@ accept sock port callback = do
                                                                threadDelay 1000000
                                                                return ()))
 
-  P.mapOnion sock port port
+  -- Do the onion mapping after that
+  P.mapOnion sock port port False pkey

@@ -20,7 +20,7 @@ module Network.Anonymous.Tor.Protocol ( Availability (..)
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (unless, void)
+import           Control.Monad                             (void)
 import           Control.Monad.Catch                       ( handle
                                                            , handleIOError )
 import           Control.Monad.IO.Class
@@ -215,13 +215,14 @@ authenticate :: MonadIO m
 authenticate s = do
   info <- protocolInfo s
 
-  -- Ensure that we can authenticate using a cookie file
-  unless (T.Cookie `elem` T.authMethods info)
-    (E.torError (E.mkTorError . E.permissionDeniedErrorType $ "Authentication via cookie file disabled."))
-
-  cookieData <- liftIO $ readCookie (T.cookieFile info)
-
-  liftIO . void $ sendCommand' s errorF (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
+  let send = liftIO . void . sendCommand' s errorF . BS8.concat . (++["\n"])
+  if T.Cookie `elem` T.authMethods info
+  then do
+    cookieData <- liftIO $ readCookie (T.cookieFile info)
+    send ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData]
+  else if T.Null `elem` T.authMethods info
+  then send ["AUTHENTICATE"]
+  else E.torError . E.mkTorError . E.permissionDeniedErrorType $ "The only authentication methods supported are COOKIE and NULL."
 
   where
 

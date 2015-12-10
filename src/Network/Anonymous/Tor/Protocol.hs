@@ -20,7 +20,7 @@ module Network.Anonymous.Tor.Protocol ( Availability (..)
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (unless, void)
+import           Control.Monad                             (void)
 import           Control.Monad.Catch                       ( handle
                                                            , handleIOError )
 import           Control.Monad.IO.Class
@@ -147,8 +147,13 @@ socksPort :: MonadIO m
           -> m Integer
 socksPort s = do
   reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
-
-  return . fst . fromJust . BS8.readInteger . fromJust . Ast.tokenValue . head . Ast.lineMessage . fromJust $ Ast.line (BS8.pack "SocksPort") reply
+  let line = fromJust $ Ast.line (BS8.pack "SocksPort") reply
+  let token = fromJust . Ast.tokenValue . head $ Ast.lineMessage line
+  return . fst . fromJust . BS8.readInteger $ removeAddress token
+  -- Removes the optional address: part from [address:]port strings
+  where removeAddress str = if ':' `BS8.elem` str
+                            then BS8.tail $ BS8.dropWhile (/= ':') str
+                            else str
 
 -- | Connect through a remote using the Tor SOCKS proxy. The remote might me a
 --   a normal host/ip or a hidden service address. When you provide a FQDN to
@@ -215,13 +220,14 @@ authenticate :: MonadIO m
 authenticate s = do
   info <- protocolInfo s
 
-  -- Ensure that we can authenticate using a cookie file
-  unless (T.Cookie `elem` T.authMethods info)
-    (E.torError (E.mkTorError . E.permissionDeniedErrorType $ "Authentication via cookie file disabled."))
-
-  cookieData <- liftIO $ readCookie (T.cookieFile info)
-
-  liftIO . void $ sendCommand' s errorF (BS8.concat ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData, "\n"])
+  let send = liftIO . void . sendCommand' s errorF . BS8.concat . (++["\n"])
+  if T.Cookie `elem` T.authMethods info
+  then do
+    cookieData <- liftIO $ readCookie (T.cookieFile info)
+    send ["AUTHENTICATE ", TE.encodeUtf8 $ HS.toText cookieData]
+  else if T.Null `elem` T.authMethods info
+  then send ["AUTHENTICATE"]
+  else E.torError . E.mkTorError . E.permissionDeniedErrorType $ "The only authentication methods supported are COOKIE and NULL."
 
   where
 

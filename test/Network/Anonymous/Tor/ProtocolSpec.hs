@@ -8,6 +8,8 @@ import           Control.Concurrent.MVar
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 
+import           Data.List                            (intersect)
+
 import qualified Network.Simple.TCP                   as NS (accept, connect,
                                                              listen, send)
 import qualified Network.Socket                       as NS (Socket)
@@ -57,9 +59,10 @@ spec = do
       port `shouldSatisfy` (> 1024)
 
   describe "when detecting protocol info" $ do
-    it "should allow cookie authentication" $ do
+    it "should allow cookie or null authentication" $ do
       info <- connect P.protocolInfo
-      (PT.authMethods info) `shouldSatisfy` (elem PT.Cookie)
+      (PT.authMethods info) `shouldSatisfy`
+        (not . null . intersect [PT.Cookie, PT.Null])
 
   describe "when authenticating with Tor" $ do
     it "should succeed" $ do

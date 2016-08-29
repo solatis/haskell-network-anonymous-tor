@@ -233,7 +233,11 @@ authenticate s = do
 
     readCookie :: Maybe FilePath -> IO HS.HexString
     readCookie Nothing     = E.torError (E.mkTorError . E.protocolErrorType $ "No cookie path specified.")
-    readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
+    readCookie (Just file) = do
+    	b <- BS.readFile file
+	if BS.length b == 32
+		then return (HS.fromBytes b)
+		else E.torError (E.mkTorError . E.protocolErrorType $ "Invalid cookie file specified.")
 
     errorF :: Ast.Line -> Maybe E.TorErrorType
     errorF (Ast.Line 250 _) = Nothing

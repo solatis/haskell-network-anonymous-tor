@@ -1,6 +1,6 @@
 name: network-anonymous-tor
 category: Network
-version: 0.10.0
+version: 0.10.1
 license: MIT
 license-file: LICENSE
 copyright: (c) 2014 Leon Mergen

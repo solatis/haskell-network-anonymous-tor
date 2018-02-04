@@ -146,14 +146,22 @@ socksPort :: MonadIO m
           => Network.Socket
           -> m Integer
 socksPort s = do
-  reply <- sendCommand s (BS8.pack "GETCONF SOCKSPORT\n")
-  let line = fromJust $ Ast.line (BS8.pack "SocksPort") reply
-  let token = fromJust . Ast.tokenValue . head $ Ast.lineMessage line
-  return . fst . fromJust . BS8.readInteger $ removeAddress token
-  -- Removes the optional address: part from [address:]port strings
-  where removeAddress str = if ':' `BS8.elem` str
-                            then BS8.tail $ BS8.dropWhile (/= ':') str
-                            else str
+  portToken <- getPortWithConf "SocksPort"
+  case portToken of
+    Just token -> readPort token
+    -- If a port is not saved in torrc, it must be fetched using the __*Port commands (tor-0.3.0.3-alpha)
+    _ -> getPortWithConf "__SocksPort" >>= \t -> readPort $ fromJust t
+  where
+    getPortWithConf conf = do
+      reply <- sendCommand s $ BS.concat ["GETCONF ", conf, "\n"]
+      let line = fromJust $ Ast.line conf reply
+      return . Ast.tokenValue . head $ Ast.lineMessage line
+    -- Removes the optional address: part from [address:]port strings
+    removeAddress str = if ':' `BS8.elem` str
+                        then BS8.tail $ BS8.dropWhile (/= ':') str
+                        else str
+    readPort = return . fst . fromJust . BS8.readInteger . removeAddress
+
 
 -- | Connect through a remote using the Tor SOCKS proxy. The remote might me a
 --   a normal host/ip or a hidden service address. When you provide a FQDN to

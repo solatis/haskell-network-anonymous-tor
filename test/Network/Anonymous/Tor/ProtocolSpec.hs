@@ -94,7 +94,7 @@ spec = do
 
         takeMVar done `shouldReturn` True
 
-  describe "when mapping an onion address" $ do
+  describe "when mapping an onion address v2" $ do
     it "should succeed in creating a mapping" $
       let serverSock sock = do
             putStrLn "got client connecting to hidden service!"
@@ -124,4 +124,35 @@ spec = do
 
           P.connect' controlSock (constructSocksDestination addr) clientSock
 
+        killThread thread
+
+  describe "when mapping an onion address v3" $ do
+    it "should succeed in creating a mapping" $
+      let serverSock sock = do
+            putStrLn "got client connecting to hidden service!"
+            NS.send sock "HELLO\n"
+          clientSock _ =
+            putStrLn "Got a connection with hidden service!"
+
+          destinationAddress onion =
+            TE.encodeUtf8 $ T.concat [B32.toText onion, T.pack ".ONION"]
+
+          constructSocksDestination onion =
+            SocksT.SocksAddress (SocksT.SocksAddrDomainName (destinationAddress onion)) 80
+
+      in do
+        thread <- liftIO $ mockServer "8080" serverSock
+
+        _ <- connect $ \controlSock -> do
+          P.authenticate controlSock
+          addr <- P.mapOnionV3 controlSock 80 8080 False Nothing
+
+          putStrLn ("got onion address: " ++ show addr)
+          putStrLn ("waiting 1 minute..")
+
+          threadDelay 60000000
+
+          putStrLn ("waited 1 minute, connecting..")
+
+          P.connect' controlSock (constructSocksDestination addr) clientSock
         killThread thread

@@ -179,4 +179,4 @@ accept sock port pkey callback = do
                                                                return ()))
 
   -- Do the onion mapping after that
-  P.mapOnion sock port port False pkey
+  P.mapOnionV3 sock port port False pkey

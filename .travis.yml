@@ -8,9 +8,9 @@ env:
 matrix:
   allow_failures:
    - env: CABALVER=1.22 GHCVER=head
-    
+
 before_install:
- - travis_retry sudo add-apt-repository -y ppa:hvr/ghc 
+ - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
  - travis_retry sudo apt-get update
 
  - sudo apt-get install build-essential libevent-dev libssl-dev
@@ -27,7 +27,7 @@ before_install:
  - echo "ControlPort 9051" >> ~/.torrc
  - echo "CookieAuthentication 1" >> ~/.torrc
  - echo "ExtORPortCookieAuthFileGroupReadable 1" >> ~/.torrc
- - tor 
+ - tor
 
 # Wait until Tor control port is open
  - nc -zvv localhost 9051; out=$?; while [[ $out -ne 0 ]]; do echo "Retry hit port 9051..."; nc -zvv localhost 9051; out=$?; sleep 1; done
@@ -39,7 +39,7 @@ before_install:
 
 # Install hlint (via apt-get if available, otherwise via cabal)
  - travis_retry sudo apt-get -q -y install hlint || cabal install hlint
- 
+
 # Install hpc-coveralls
  - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/ --constraint='aeson >= 0.7'
  - which run-cabal-test
@@ -52,12 +52,12 @@ install:
 
 script:
  - hlint src --ignore="Parse error"
- - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug 
+ - cabal configure --enable-tests --enable-benchmarks --enable-coverage -fdebug
  - cabal build -j
  - travis_retry sudo -E su $USER -c '/home/$USER/.cabal/bin/run-cabal-test --cabal-name=cabal --show-details=streaming'
  - cabal check
  - cabal sdist
- 
+
 # The following scriptlet checks that the resulting source distribution can be built & installed
  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
    cd dist/;

@@ -16,7 +16,7 @@ before_install:
  - sudo apt-get install build-essential libevent-dev libssl-dev
  - wget https://dist.torproject.org/tor-0.2.9.17.tar.gz
  - tar -xzf tor-0.2.9.17.tar.gz
- - cd tor-0.2.9.17/
+ - cd tor-0.2.9.17
  - ./configure --disable-unittests --disable-system-torrc
  - make -j4
  - sudo make install

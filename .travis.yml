@@ -41,7 +41,7 @@ before_install:
  - travis_retry sudo apt-get -q -y install hlint || cabal install hlint
 
 # Install hpc-coveralls
- - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/ --constraint='aeson >= 0.7'
+ - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/
  - which run-cabal-test
 
 

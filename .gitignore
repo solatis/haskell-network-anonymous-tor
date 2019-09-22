@@ -10,3 +10,4 @@ cabal-dev
 .hpc/
 cabal.sandbox.config
 cabal.config
+dist-newstyle

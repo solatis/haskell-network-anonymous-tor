@@ -20,7 +20,7 @@ module Network.Anonymous.Tor.Protocol ( Availability (..)
 
 import           Control.Concurrent.MVar
 
-import           Control.Monad                             (void)
+import           Control.Monad                             (void, liftM)
 import           Control.Monad.Catch                       ( handle
                                                            , handleIOError )
 import           Control.Monad.IO.Class
@@ -233,7 +233,7 @@ authenticate s = do
 
     readCookie :: Maybe FilePath -> IO HS.HexString
     readCookie Nothing     = E.torError (E.mkTorError . E.protocolErrorType $ "No cookie path specified.")
-    readCookie (Just file) = return . HS.fromBytes =<< BS.readFile file
+    readCookie (Just file) = liftM HS.fromBytes (BS.readFile file)
 
     errorF :: Ast.Line -> Maybe E.TorErrorType
     errorF (Ast.Line 250 _) = Nothing

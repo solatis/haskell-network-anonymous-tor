@@ -17,8 +17,7 @@ module Network.Anonymous.Tor.Protocol.Parser ( quotedString
                                              , token
                                              , tokens ) where
 
-import           Control.Applicative                         ((*>), (<$>), (<*), (<*>),
-                                                              (<|>))
+import           Control.Applicative                         ((<|>))
 
 import qualified Data.Attoparsec.ByteString                  as Atto
 import qualified Data.Attoparsec.ByteString.Char8            as Atto8

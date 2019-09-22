@@ -41,7 +41,7 @@ before_install:
  - travis_retry sudo apt-get -q -y install hlint || cabal install hlint
 
 # Install hpc-coveralls
- - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/
+ # - cabal install hpc-coveralls -j --bindir=$HOME/.cabal/bin/
  - which run-cabal-test
 
 
@@ -71,4 +71,4 @@ script:
 
 after_script:
  - find .
- - hpc-coveralls test-suite --exclude-dir=test --display-report
+ # - hpc-coveralls test-suite --exclude-dir=test --display-report
